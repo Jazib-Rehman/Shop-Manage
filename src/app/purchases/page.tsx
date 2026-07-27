@@ -58,6 +58,7 @@ export default function PurchasesPage() {
   const [description, setDescription] = useState("");
   const [allocations, setAllocations] = useState<SaleAllocation[]>([]);
   const [allocUnit, setAllocUnit] = useState<AllocUnit>("percent");
+  const [shareWith, setShareWith] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -116,6 +117,7 @@ export default function PurchasesPage() {
     setDescription("");
     setAllocations([]);
     setAllocUnit("percent");
+    setShareWith(false);
     setError("");
   };
 
@@ -162,7 +164,7 @@ export default function PurchasesPage() {
     const p = shop.products.find((x) => x.id === id);
     if (p && !editId) {
       setUnitCost(String(p.costPrice));
-      syncAllocations(Number(qty) || 0, id);
+      if (shareWith) syncAllocations(Number(qty) || 0, id);
     }
   };
 
@@ -171,7 +173,7 @@ export default function PurchasesPage() {
     const q = Number(qty);
     const c = Number(unitCost);
     if (!productId || q <= 0 || c < 0) return;
-    if (!editId && shop.partners.length > 0) {
+    if (!editId && shareWith) {
       const err = validateAllocations(q, allocations);
       if (err) {
         setError(err);
@@ -187,7 +189,13 @@ export default function PurchasesPage() {
         qty: q,
         unitCost: c,
         description,
-        ...(!editId && shop.partners.length > 0 ? { allocations } : {}),
+        ...(!editId
+          ? {
+              allocations: shareWith
+                ? allocations
+                : [{ partnerId: null, qty: q }],
+            }
+          : {}),
       });
       close();
     } catch (err) {
@@ -620,7 +628,7 @@ export default function PurchasesPage() {
                     value={qty}
                     onChange={(e) => {
                       setQty(e.target.value);
-                      if (!editId) syncAllocations(Number(e.target.value) || 0);
+                      if (!editId && shareWith) syncAllocations(Number(e.target.value) || 0);
                     }}
                     required
                   />
@@ -662,15 +670,25 @@ export default function PurchasesPage() {
 
               {!editId && shop.partners.length > 0 && productId && (
                 <fieldset className="space-y-3 rounded-xl border border-zinc-300 bg-zinc-50/80 p-4">
+                  <label className="flex cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-zinc-300 text-teal-700"
+                      checked={shareWith}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setShareWith(on);
+                        if (on) syncAllocations(Number(qty) || 0);
+                        else setAllocations([]);
+                      }}
+                    />
+                    <span className="text-sm font-bold text-zinc-800">Purchase shares</span>
+                    <span className="text-sm text-zinc-500">— split with partners</span>
+                  </label>
+                  {shareWith && (
+                    <>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <legend className="flex items-center gap-1.5 px-1 text-sm font-bold text-zinc-800">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-teal-700" aria-hidden>
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      </svg>
-                      Purchase shares
-                    </legend>
+                    <p className="text-sm text-zinc-600">Who owns this purchase? Sum must match qty.</p>
                     <div className="flex gap-1.5">
                       {([["percent", "%"], ["sqft", "sq ft"], ["amount", "Rs"]] as const).map(([key, label]) => (
                         <button
@@ -688,7 +706,6 @@ export default function PurchasesPage() {
                       ))}
                     </div>
                   </div>
-                  <p className="text-sm text-zinc-600">Who owns this purchase? Sum must match qty.</p>
                   {allocations.map((a, i) => {
                     const label = a.partnerId
                       ? shop.partners.find((p) => p.id === a.partnerId)?.name || "Partner"
@@ -722,6 +739,8 @@ export default function PurchasesPage() {
                   <p className={`text-sm font-semibold ${Math.abs(allocSum - qNum) > 0.02 ? "text-red-700" : "text-zinc-600"}`}>
                     Allocated {sqft(allocSum)} / {sqft(qNum)}
                   </p>
+                    </>
+                  )}
                 </fieldset>
               )}
 

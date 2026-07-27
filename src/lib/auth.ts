@@ -71,9 +71,12 @@ export const sessionCookieOptions = {
   maxAge: MAX_AGE,
 };
 
-/** Current user id from cookie, or a 401 response. */
+/** Current user id from cookie or Bearer header, or a 401 response. */
 export async function requireUser(): Promise<string | NextResponse> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const { headers } = await import("next/headers");
+  const h = await headers();
+  const bearer = h.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const token = bearer || (await cookies()).get(SESSION_COOKIE)?.value;
   const userId = await verifySession(token);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return userId;

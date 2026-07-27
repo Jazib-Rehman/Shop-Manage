@@ -86,6 +86,15 @@ const I = {
       <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </>
   ),
+  expenses: (
+    <>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+      <path d="M10 9H8" />
+    </>
+  ),
   contacts: (
     <>
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -128,6 +137,7 @@ const groups = [
       { href: "/purchases", label: "Purchases", icon: I.purchases },
       { href: "/trips", label: "Trips & freight", icon: I.trips },
       { href: "/sales", label: "Sales", icon: I.sales },
+      { href: "/expenses", label: "Expenses", icon: I.expenses },
     ],
   },
   {

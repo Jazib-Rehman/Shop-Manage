@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { useAlert } from "@/components/Alert";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { toast } = useAlert();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,10 +27,13 @@ export default function SignupPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Signup failed");
       }
+      toast("Account created", "success");
       router.replace("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed");
+      const msg = err instanceof Error ? err.message : "Signup failed";
+      setError(msg);
+      toast(msg, "error");
       setSaving(false);
     }
   };

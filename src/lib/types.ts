@@ -104,6 +104,15 @@ export type PartnerLedgerEntry = {
   date: string;
 };
 
+export type Expense = {
+  id: string;
+  category: string;
+  amount: number;
+  description: string;
+  spentAt: string;
+  date: string;
+};
+
 export type ShopData = {
   partners: Partner[];
   customers: Customer[];
@@ -111,6 +120,7 @@ export type ShopData = {
   products: Product[];
   purchases: Purchase[];
   sales: Sale[];
+  expenses: Expense[];
 };
 
 export const productLabel = (p: Pick<Product, "name" | "dimension">) =>

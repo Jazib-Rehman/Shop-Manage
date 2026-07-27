@@ -143,3 +143,14 @@ export function mapSale(d: any) {
     date: (d.createdAt as Date).toISOString(),
   };
 }
+
+export function mapExpense(d: any) {
+  return {
+    id: String(d._id),
+    category: d.category ?? "",
+    amount: Number(d.amount) || 0,
+    description: d.description ?? d.note ?? "",
+    spentAt: new Date(d.spentAt ?? d.createdAt).toISOString(),
+    date: (d.createdAt as Date).toISOString(),
+  };
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { useAlert } from "@/components/Alert";
 import type { Customer } from "@/lib/types";
@@ -119,9 +120,15 @@ export default function CustomersPage() {
                   editing?.id === c.id ? "border-teal-600 ring-2 ring-teal-600/20" : "border-zinc-300"
                 }`}
               >
-                <p className="truncate font-bold text-zinc-900">{c.name}</p>
+                <Link href={`/customers/${c.id}`} className="truncate font-bold text-teal-900 hover:underline">{c.name}</Link>
                 <p className="mt-0.5 text-sm text-zinc-600">{c.phone || "No phone"}</p>
                 <div className="mt-3 flex gap-1.5 border-t border-zinc-100 pt-3">
+                  <Link
+                    href={`/customers/${c.id}`}
+                    className="inline-flex flex-1 items-center justify-center rounded-lg px-2.5 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200"
+                  >
+                    Details
+                  </Link>
                   <button
                     type="button"
                     className="inline-flex flex-1 items-center justify-center rounded-lg px-2.5 py-2 text-sm font-semibold text-teal-800 ring-1 ring-teal-200"
@@ -161,9 +168,20 @@ export default function CustomersPage() {
                 )}
                 {rows.map((c) => (
                   <tr key={c.id} className="border-b border-zinc-100 last:border-0">
-                    <td className="px-4 py-3.5 font-semibold text-zinc-900">{c.name}</td>
+                    <td className="px-4 py-3.5">
+                      <Link href={`/customers/${c.id}`} className="font-semibold text-teal-900 hover:underline">{c.name}</Link>
+                    </td>
                     <td className="px-4 py-3.5 text-zinc-700">{c.phone || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-right text-sm">
+                      <Link
+                        href={`/customers/${c.id}`}
+                        className="mr-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 font-semibold text-zinc-700 hover:bg-zinc-100"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
+                          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Details
+                      </Link>
                       <button
                         type="button"
                         className="mr-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 font-semibold text-teal-800 hover:bg-teal-50"

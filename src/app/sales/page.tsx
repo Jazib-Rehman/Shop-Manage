@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { toPng } from "html-to-image";
 import { useAlert } from "@/components/Alert";
 import { ProductSearchSelect } from "@/components/ProductSearchSelect";
 import { CustomerSelect } from "@/components/CustomerSelect";
@@ -38,6 +39,9 @@ export default function SalesPage() {
   const shop = useShop();
   const { alert, confirm } = useAlert();
   const [open, setOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState<Sale | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const [snapping, setSnapping] = useState(false);
   const [payOpen, setPayOpen] = useState<Sale | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
@@ -67,16 +71,17 @@ export default function SalesPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
-    if (!open && !payOpen) return;
+    if (!open && !payOpen && !detailOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpen(false);
         setPayOpen(null);
+        setDetailOpen(null);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, payOpen]);
+  }, [open, payOpen, detailOpen]);
 
   const { products, sales, customers } = shop;
   const rows = useMemo(() => {
@@ -171,6 +176,38 @@ export default function SalesPage() {
     setPayOpen(r);
     setPayAmount(String(due));
     setPayNote("");
+  };
+
+  const downloadDetail = async () => {
+    const el = detailRef.current;
+    if (!el) return;
+    setSnapping(true);
+    const prev = {
+      maxHeight: el.style.maxHeight,
+      height: el.style.height,
+      overflow: el.style.overflow,
+    };
+    el.style.maxHeight = "none";
+    el.style.height = `${el.scrollHeight}px`;
+    el.style.overflow = "visible";
+    try {
+      const dataUrl = await toPng(el, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: "#fafafa",
+        height: el.scrollHeight,
+        filter: (node) => !(node instanceof Element && node.closest("[data-shot-ignore]")),
+      });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `sale-${detailOpen?.id?.slice(-6) || "detail"}.png`;
+      a.click();
+    } finally {
+      el.style.maxHeight = prev.maxHeight;
+      el.style.height = prev.height;
+      el.style.overflow = prev.overflow;
+      setSnapping(false);
+    }
   };
 
   const onProduct = (id: string) => {
@@ -500,6 +537,16 @@ export default function SalesPage() {
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-100 pt-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200"
+                  aria-label="Details"
+                  onClick={() => setDetailOpen(r)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
                 {r.paymentStatus !== "paid" && (
                   <>
                     <button
@@ -594,6 +641,16 @@ export default function SalesPage() {
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 text-right text-sm">
+                    <button
+                      type="button"
+                      className="mr-1 inline-flex items-center gap-1 rounded-md px-2 py-1.5 font-semibold text-zinc-700 hover:bg-zinc-100"
+                      aria-label="Details"
+                      onClick={() => setDetailOpen(r)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
                     {r.paymentStatus !== "paid" && (
                       <>
                         <button
@@ -902,6 +959,158 @@ export default function SalesPage() {
           </div>
         </div>
       )}
+
+      {detailOpen && (() => {
+        const r = detailOpen;
+        const due = remainingBalance(r.total, r.amountPaid || 0);
+        const prod = productOf(r.productId);
+        const saleAllocations = r.allocations?.length
+          ? r.allocations
+          : [{ partnerId: null, qty: r.qty }];
+        const profitPerSqFt = r.qty > 0 ? r.profit / r.qty : 0;
+        const distributions = saleAllocations.map((a) => {
+          const partner = a.partnerId
+            ? shop.partners.find((p) => p.id === a.partnerId)
+            : null;
+          const allocationProfit = a.qty * profitPerSqFt;
+          const incomePercent = partner?.incomePercent ?? 100;
+          const income = partner
+            ? allocationProfit * (incomePercent / 100)
+            : allocationProfit;
+          return { ...a, partner, allocationProfit, incomePercent, income };
+        });
+        const partnerProfit = distributions
+          .filter((d) => d.partner)
+          .reduce((sum, d) => sum + d.income, 0);
+        const ownerProfit = r.profit - partnerProfit;
+        const row = (label: string, value: string) => (
+          <div className="flex justify-between gap-3 border-b border-zinc-100 py-2.5 text-base last:border-0">
+            <span className="font-medium text-zinc-600">{label}</span>
+            <span className="text-right font-bold tabular-nums text-zinc-900">{value}</span>
+          </div>
+        );
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+            <button type="button" className="absolute inset-0 bg-zinc-900/50 backdrop-blur-[2px]" aria-label="Close" onClick={() => setDetailOpen(null)} />
+            <div
+              ref={detailRef}
+              role="dialog"
+              aria-modal="true"
+              className="relative z-10 max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-zinc-300 bg-zinc-50 shadow-xl sm:rounded-2xl"
+            >
+              <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-zinc-200 bg-white px-4 py-4 sm:px-5">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-bold text-zinc-900">Sale details</h2>
+                  <p className="mt-0.5 truncate text-base text-zinc-600">
+                    {prod ? productLabel(prod) : nameOf(r.productId)} · {customerOf(r.customerId)}
+                  </p>
+                </div>
+                <span className={`rounded-lg px-3 py-1 text-sm font-semibold ${statusStyle[r.paymentStatus]}`}>
+                  {statusLabel[r.paymentStatus]}
+                </span>
+                <button
+                  type="button"
+                  data-shot-ignore
+                  disabled={snapping}
+                  className="rounded-lg p-2 text-teal-800 hover:bg-teal-50 disabled:opacity-50"
+                  aria-label="Download image"
+                  onClick={downloadDetail}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+                  </svg>
+                </button>
+                <button type="button" data-shot-ignore className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="Close" onClick={() => setDetailOpen(null)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden>
+                    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-4 px-4 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-5">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-white p-3 ring-1 ring-zinc-200">
+                    <p className="text-sm font-medium text-zinc-500">Sale total</p>
+                    <p className="mt-1 text-lg font-bold tabular-nums text-zinc-900">{money(r.total)}</p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">
+                    <p className="text-sm font-medium text-emerald-700">Gross profit</p>
+                    <p className="mt-1 text-lg font-bold tabular-nums text-emerald-800">{money(r.profit)}</p>
+                  </div>
+                  <div className="rounded-xl bg-teal-50 p-3 ring-1 ring-teal-200">
+                    <p className="text-sm font-medium text-teal-700">Your profit</p>
+                    <p className="mt-1 text-lg font-bold tabular-nums text-teal-900">{money(ownerProfit)}</p>
+                  </div>
+                </div>
+
+                <section className="rounded-xl bg-white p-4 ring-1 ring-zinc-200">
+                  <h3 className="mb-2 text-base font-bold text-zinc-900">Sale breakdown</h3>
+                  {row("Date", new Date(r.date).toLocaleString())}
+                  {row("Customer", customerOf(r.customerId))}
+                  {row("Qty", sqft(r.qty))}
+                  {row("Unit price", money(r.unitPrice))}
+                  {row("Cost / sq ft", money(r.qty > 0 ? r.costTotal / r.qty : 0))}
+                  {row("Cost", money(r.costTotal))}
+                  {row("Profit / sq ft", money(profitPerSqFt))}
+                  {row("Margin", `${r.total > 0 ? ((r.profit / r.total) * 100).toFixed(1) : "0.0"}%`)}
+                  {row("Paid", money(r.amountPaid || 0))}
+                  {row("Due", money(due))}
+                  {row("Due date", r.dueDate ? new Date(r.dueDate).toLocaleDateString() : "—")}
+                  {row("Paid at", r.paidAt ? new Date(r.paidAt).toLocaleString() : "—")}
+                  {row("Description", r.description || "—")}
+                </section>
+
+                <section>
+                  <div className="mb-2 flex items-end justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-zinc-900">Profit distribution</h3>
+                      <p className="text-sm text-zinc-500">Based on sold quantity and each partner&apos;s income %</p>
+                    </div>
+                    <span className="text-sm font-semibold text-zinc-600">Partners: {money(partnerProfit)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {distributions.map((d, index) => (
+                      <div key={`${d.partnerId ?? "you"}-${index}`} className="rounded-xl bg-white p-3.5 ring-1 ring-zinc-200">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-lg font-bold text-zinc-900">{d.partner?.name ?? "You (owner)"}</p>
+                            <p className="text-sm text-zinc-600">
+                              {sqft(d.qty)} · {r.qty > 0 ? ((d.qty / r.qty) * 100).toFixed(1) : "0.0"}% of sale
+                            </p>
+                          </div>
+                          <p className="text-lg font-bold tabular-nums text-emerald-700">{money(d.income)}</p>
+                        </div>
+                        <div className="mt-2 rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+                          Share profit {money(d.allocationProfit)}
+                          {d.partner && ` × ${d.incomePercent}% income = ${money(d.income)}`}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between rounded-xl bg-teal-50 px-4 py-3.5 text-base ring-1 ring-teal-200">
+                      <span className="font-bold text-teal-800">Your total profit</span>
+                      <span className="text-lg font-bold tabular-nums text-teal-900">{money(ownerProfit)}</span>
+                    </div>
+                  </div>
+                </section>
+
+                {r.payments?.length > 0 && (
+                  <section className="rounded-xl bg-white p-4 ring-1 ring-zinc-200">
+                    <h3 className="mb-2 text-base font-bold text-zinc-900">Payment history</h3>
+                    {r.payments.map((p) => (
+                      <div key={p.id}>
+                        {row(
+                          `${new Date(p.paidAt).toLocaleString()}${p.note ? ` · ${p.note}` : ""}`,
+                          money(p.amount)
+                        )}
+                      </div>
+                    ))}
+                  </section>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {payOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">

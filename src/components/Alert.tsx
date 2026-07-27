@@ -14,9 +14,13 @@ type DialogState =
   | { mode: "confirm"; message: string; resolve: (ok: boolean) => void }
   | null;
 
+type ToastTone = "success" | "error" | "info";
+type ToastItem = { id: number; message: string; tone: ToastTone };
+
 type AlertApi = {
   alert: (message: string) => Promise<void>;
   confirm: (message: string) => Promise<boolean>;
+  toast: (message: string, tone?: ToastTone) => void;
 };
 
 const AlertCtx = createContext<AlertApi | null>(null);
@@ -27,9 +31,17 @@ export function useAlert() {
   return ctx;
 }
 
+const toneClass: Record<ToastTone, string> = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  error: "border-red-200 bg-red-50 text-red-900",
+  info: "border-zinc-200 bg-white text-zinc-900",
+};
+
 export function AlertProvider({ children }: { children: ReactNode }) {
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const seq = useRef(0);
+  const toastSeq = useRef(0);
 
   const alert = useCallback((message: string) => {
     return new Promise<void>((resolve) => {
@@ -45,6 +57,12 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const toast = useCallback((message: string, tone: ToastTone = "info") => {
+    const id = ++toastSeq.current;
+    setToasts((t) => [...t.slice(-4), { id, message, tone }]);
+    setTimeout(() => setToasts((all) => all.filter((x) => x.id !== id)), 3200);
+  }, []);
+
   const closeAlert = () => {
     if (dialog?.mode === "alert") dialog.resolve();
     setDialog(null);
@@ -56,8 +74,19 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AlertCtx.Provider value={{ alert, confirm }}>
+    <AlertCtx.Provider value={{ alert, confirm, toast }}>
       {children}
+      <div className="pointer-events-none fixed right-4 top-4 z-[110] flex w-[min(100%-2rem,22rem)] flex-col gap-2 sm:right-6 sm:top-6">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            role="status"
+            className={`pointer-events-auto rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${toneClass[t.tone]}`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <button

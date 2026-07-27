@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAlert } from "@/components/Alert";
 import type { Customer } from "@/lib/types";
 import { customerLabel } from "@/lib/types";
 
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function CustomerSelect({ customers, value, onChange, onCreated }: Props) {
+  const { toast } = useAlert();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
@@ -60,8 +62,11 @@ export function CustomerSelect({ customers, value, onChange, onCreated }: Props)
       setName("");
       setPhone("");
       setQ("");
+      toast("Customer added", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      const msg = err instanceof Error ? err.message : "Failed";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setSaving(false);
     }

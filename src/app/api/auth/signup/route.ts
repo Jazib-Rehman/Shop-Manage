@@ -27,5 +27,5 @@ export async function POST(req: Request) {
   const user = await User.create({ email: e, passwordHash: hashPassword(p) });
   const token = await createSession(String(user._id));
   (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions);
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json({ ok: true, token }, { status: 201 });
 }

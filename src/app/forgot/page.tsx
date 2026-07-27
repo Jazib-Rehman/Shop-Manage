@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { useAlert } from "@/components/Alert";
 
 export default function ForgotPage() {
+  const { toast } = useAlert();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
@@ -22,9 +24,13 @@ export default function ForgotPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Request failed");
-      setDone(data.message || "Check your email for a reset link.");
+      const msg = data.message || "Check your email for a reset link.";
+      setDone(msg);
+      toast(msg, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setSaving(false);
     }

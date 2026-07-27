@@ -49,6 +49,38 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json(mapSale(doc));
   }
 
+  if (body.updatePayment != null) {
+    const { id: paymentId, amount, note } = body.updatePayment as {
+      id: string;
+      amount?: number;
+      note?: string;
+    };
+    const pay = doc.payments.id(paymentId);
+    if (!pay) return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    const others = (doc.payments ?? [])
+      .filter((p: { _id?: { toString(): string } }) => String(p._id) !== String(paymentId))
+      .reduce((s: number, p: { amount: number }) => s + p.amount, 0);
+    const nextAmt = amount != null ? Number(amount) : pay.amount;
+    if (!(nextAmt > 0) || others + nextAmt > doc.total + 1e-9) {
+      return NextResponse.json({ error: "Invalid payment amount" }, { status: 400 });
+    }
+    pay.amount = nextAmt;
+    if (note != null) pay.note = String(note).trim();
+    applyPaymentTotals(doc);
+    await doc.save();
+    return NextResponse.json(mapSale(doc));
+  }
+
+  if (body.deletePayment != null) {
+    const paymentId = String(body.deletePayment);
+    const pay = doc.payments.id(paymentId);
+    if (!pay) return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    pay.deleteOne();
+    applyPaymentTotals(doc);
+    await doc.save();
+    return NextResponse.json(mapSale(doc));
+  }
+
   if (body.markPaid === true) {
     const due = Math.max(0, doc.total - (doc.amountPaid || 0));
     if (due > 0) {

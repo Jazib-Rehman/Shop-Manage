@@ -111,7 +111,7 @@ function CashFlowBars({
 export default function PartnerBookPage() {
   const { id } = useParams<{ id: string }>();
   const shop = useShop();
-  const { alert, confirm } = useAlert();
+  const { alert, confirm, toast } = useAlert();
   const [book, setBook] = useState<Book | null>(null);
   const [error, setError] = useState("");
   const [entryOpen, setEntryOpen] = useState(false);
@@ -174,10 +174,14 @@ export default function PartnerBookPage() {
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
+      const wasEdit = !!editId;
       closeEntry();
       await load();
+      toast(wasEdit ? "Entry updated" : "Entry added", "success");
     } catch (err) {
-      await alert(err instanceof Error ? err.message : "Failed");
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast(msg, "error");
+      await alert(msg);
     } finally {
       setSaving(false);
     }
@@ -191,8 +195,11 @@ export default function PartnerBookPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       await load();
+      toast("Entry deleted", "success");
     } catch (err) {
-      await alert(err instanceof Error ? err.message : "Failed");
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast(msg, "error");
+      await alert(msg);
     }
   };
 

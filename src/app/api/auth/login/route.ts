@@ -19,5 +19,5 @@ export async function POST(req: Request) {
   }
   const token = await createSession(String(user._id));
   (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, token });
 }

@@ -150,7 +150,7 @@ function PurchaseSearchSelect({
 
 export default function TripsPage() {
   const shop = useShop();
-  const { alert, confirm } = useAlert();
+  const { alert, confirm, toast } = useAlert();
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
@@ -263,8 +263,11 @@ export default function TripsPage() {
         });
         await Promise.all([loadTrips(), shop.refresh()]);
         close();
+        toast("Trip updated", "success");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Save failed");
+        const msg = err instanceof Error ? err.message : "Save failed";
+        setError(msg);
+        toast(msg, "error");
       } finally {
         setSaving(false);
       }
@@ -286,8 +289,11 @@ export default function TripsPage() {
       });
       await Promise.all([loadTrips(), shop.refresh()]);
       close();
+      toast("Trip recorded", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      const msg = err instanceof Error ? err.message : "Save failed";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setSaving(false);
     }
@@ -298,8 +304,11 @@ export default function TripsPage() {
     try {
       await api(`/api/trips/${t.id}`, { method: "DELETE" });
       await Promise.all([loadTrips(), shop.refresh()]);
+      toast("Trip deleted", "success");
     } catch (err) {
-      await alert(err instanceof Error ? err.message : "Delete failed");
+      const msg = err instanceof Error ? err.message : "Delete failed";
+      await alert(msg);
+      toast(msg, "error");
     }
   };
 

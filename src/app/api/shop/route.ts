@@ -3,6 +3,7 @@ import { isAuthed, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   mapCustomer,
+  mapExpense,
   mapMarble,
   mapPartner,
   mapProduct,
@@ -10,6 +11,7 @@ import {
   mapSale,
 } from "@/lib/map";
 import { Customer } from "@/models/Customer";
+import { Expense } from "@/models/Expense";
 import { Marble } from "@/models/Marble";
 import { Partner } from "@/models/Partner";
 import { Product } from "@/models/Product";
@@ -21,7 +23,7 @@ export async function GET() {
   if (!isAuthed(userId)) return userId;
   try {
     await db();
-    const [partners, customers, marbles, products, purchases, sales] =
+    const [partners, customers, marbles, products, purchases, sales, expenses] =
       await Promise.all([
         Partner.find({ userId }).sort({ name: 1 }).lean(),
         Customer.find({ userId }).sort({ name: 1 }).lean(),
@@ -29,6 +31,7 @@ export async function GET() {
         Product.find({ userId }).sort({ name: 1, dimension: 1 }).lean(),
         Purchase.find({ userId }).sort({ createdAt: -1 }).lean(),
         Sale.find({ userId }).sort({ createdAt: -1 }).lean(),
+        Expense.find({ userId }).sort({ spentAt: -1 }).lean(),
       ]);
     return NextResponse.json({
       partners: partners.map(mapPartner),
@@ -37,6 +40,7 @@ export async function GET() {
       products: products.map(mapProduct),
       purchases: purchases.map(mapPurchase),
       sales: sales.map(mapSale),
+      expenses: expenses.map(mapExpense),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "DB error";

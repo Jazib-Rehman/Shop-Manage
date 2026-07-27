@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
+import { useAlert } from "@/components/Alert";
 
 function ResetForm() {
   const router = useRouter();
+  const { toast } = useAlert();
   const token = useSearchParams().get("token") || "";
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -23,9 +25,12 @@ function ResetForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Reset failed");
+      toast("Password updated", "success");
       router.replace("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Reset failed");
+      const msg = err instanceof Error ? err.message : "Reset failed";
+      setError(msg);
+      toast(msg, "error");
       setSaving(false);
     }
   };

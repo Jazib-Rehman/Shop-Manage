@@ -36,7 +36,7 @@ function fromPercent(percent: number, unit: ShareUnit, p: Product) {
 
 export default function InventoryPage() {
   const shop = useShop();
-  const { alert, confirm } = useAlert();
+  const { alert, confirm, toast } = useAlert();
   const [edit, setEdit] = useState<Product | null>(null);
   const [shares, setShares] = useState<ProductShare[]>([]);
   const [unit, setUnit] = useState<ShareUnit>("percent");
@@ -150,8 +150,11 @@ export default function InventoryPage() {
       await shop.refresh();
       syncProduct(data.product as Product);
       if (hist?.id === adjFor.id) await loadHistory(adjFor.id);
+      toast(adjEditId ? "Adjustment updated" : "Adjustment recorded", "success");
     } catch (err) {
-      setAdjError(err instanceof Error ? err.message : "Failed");
+      const msg = err instanceof Error ? err.message : "Failed";
+      setAdjError(msg);
+      toast(msg, "error");
     } finally {
       setAdjSaving(false);
     }
@@ -167,8 +170,11 @@ export default function InventoryPage() {
       await shop.refresh();
       syncProduct(data.product as Product);
       await loadHistory(hist.id);
+      toast("Adjustment deleted", "success");
     } catch (err) {
-      await alert(err instanceof Error ? err.message : "Failed");
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast(msg, "error");
+      await alert(msg);
     }
   };
 
