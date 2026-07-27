@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useAlert } from "@/components/Alert";
+import { money } from "@/lib/calc";
+import { remainingBalance } from "@/lib/payment";
 import type { Customer } from "@/lib/types";
 import { useShop } from "@/lib/store";
 
@@ -15,6 +17,22 @@ export default function CustomersPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [fSearch, setFSearch] = useState("");
+
+  const dueByCustomer = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of shop.sales) {
+      if (!s.customerId) continue;
+      const due = remainingBalance(s.total, s.amountPaid || 0);
+      if (due <= 0) continue;
+      m.set(s.customerId, (m.get(s.customerId) || 0) + due);
+    }
+    return m;
+  }, [shop.sales]);
+
+  const totalReceivable = useMemo(
+    () => [...dueByCustomer.values()].reduce((a, b) => a + b, 0),
+    [dueByCustomer]
+  );
 
   if (!shop.ready) return <p className="text-zinc-500">Loading…</p>;
 
@@ -84,7 +102,13 @@ export default function CustomersPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Customers</h1>
           <p className="mt-1 text-sm text-zinc-600 sm:text-base">
-            {rows.length} of {shop.customers.length} · used on credit / partial sales
+            {rows.length} of {shop.customers.length}
+            {totalReceivable > 0 && (
+              <>
+                {" · "}
+                <span className="font-semibold text-amber-800">Receivable {money(totalReceivable)}</span>
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -120,7 +144,14 @@ export default function CustomersPage() {
                   editing?.id === c.id ? "border-teal-600 ring-2 ring-teal-600/20" : "border-zinc-300"
                 }`}
               >
-                <Link href={`/customers/${c.id}`} className="truncate font-bold text-teal-900 hover:underline">{c.name}</Link>
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/customers/${c.id}`} className="truncate font-bold text-teal-900 hover:underline">{c.name}</Link>
+                  {(dueByCustomer.get(c.id) || 0) > 0 && (
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-amber-800">
+                      {money(dueByCustomer.get(c.id)!)}
+                    </span>
+                  )}
+                </div>
                 <p className="mt-0.5 text-sm text-zinc-600">{c.phone || "No phone"}</p>
                 <div className="mt-3 flex gap-1.5 border-t border-zinc-100 pt-3">
                   <Link
@@ -155,13 +186,14 @@ export default function CustomersPage() {
                 <tr>
                   <th className="px-4 py-3.5">Name</th>
                   <th className="px-4 py-3.5">Phone</th>
+                  <th className="px-4 py-3.5 text-right">Receivable</th>
                   <th className="px-4 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-4 py-10 text-center text-zinc-600">
+                    <td colSpan={4} className="px-4 py-10 text-center text-zinc-600">
                       {shop.customers.length === 0 ? "No customers yet" : "No matches"}
                     </td>
                   </tr>
@@ -172,6 +204,13 @@ export default function CustomersPage() {
                       <Link href={`/customers/${c.id}`} className="font-semibold text-teal-900 hover:underline">{c.name}</Link>
                     </td>
                     <td className="px-4 py-3.5 text-zinc-700">{c.phone || "—"}</td>
+                    <td
+                      className={`px-4 py-3.5 text-right tabular-nums font-semibold ${
+                        (dueByCustomer.get(c.id) || 0) > 0 ? "text-amber-800" : "text-zinc-400"
+                      }`}
+                    >
+                      {money(dueByCustomer.get(c.id) || 0)}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-right text-sm">
                       <Link
                         href={`/customers/${c.id}`}
