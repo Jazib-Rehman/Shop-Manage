@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toPng } from "html-to-image";
-import { money, sqft } from "@/lib/calc";
+import { money, qtyLabel, sqft, unitShort, unitSuffix } from "@/lib/calc";
 import type { Product, ProductShare } from "@/lib/types";
 import { mySharePercent, productLabel } from "@/lib/types";
 import { useAlert } from "@/components/Alert";
@@ -310,12 +310,12 @@ export default function InventoryPage() {
   const ownershipLines = (p: Product) => {
     const lines: string[] = [];
     const mine = mySharePercent(p);
-    if (mine > 0) lines.push(`You · ${sqft((mine / 100) * p.stock)}`);
+    if (mine > 0) lines.push(`You · ${sqft((mine / 100) * p.stock, p.unit)}`);
     for (const s of p.shares || []) {
       if (!(s.percent > 0)) continue;
-      lines.push(`${partnerName(s.partnerId)} · ${sqft((s.percent / 100) * p.stock)}`);
+      lines.push(`${partnerName(s.partnerId)} · ${sqft((s.percent / 100) * p.stock, p.unit)}`);
     }
-    if (!lines.length) lines.push(`You · ${sqft(p.stock)}`);
+    if (!lines.length) lines.push(`You · ${sqft(p.stock, p.unit)}`);
     return lines;
   };
 
@@ -567,7 +567,7 @@ export default function InventoryPage() {
                   p.stock <= p.lowStockAt ? "text-amber-800" : "text-zinc-900"
                 }`}
               >
-                {sqft(p.stock)}
+                {sqft(p.stock, p.unit)}
               </p>
             </div>
 
@@ -638,7 +638,7 @@ export default function InventoryPage() {
                   <p className="mt-0.5 font-mono text-sm text-zinc-600">{p.dimension}</p>
                 </td>
                 <td className={`px-4 py-3.5 tabular-nums font-semibold ${p.stock <= p.lowStockAt ? "text-amber-800" : "text-zinc-900"}`}>
-                  {sqft(p.stock)}
+                  {sqft(p.stock, p.unit)}
                 </td>
                 <td className="max-w-[220px] px-4 py-3.5 text-sm text-zinc-700">
                   <div className="space-y-0.5">
@@ -686,19 +686,19 @@ export default function InventoryPage() {
             <dl className="space-y-2.5 px-5 py-4 text-sm">
               <div className="flex justify-between gap-4">
                 <dt className="text-zinc-500">Actual</dt>
-                <dd className="tabular-nums font-medium">{money(costFor.costActual || 0)} / sq ft</dd>
+                <dd className="tabular-nums font-medium">{money(costFor.costActual || 0)} / {unitShort(costFor.unit)}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-zinc-500">Freight</dt>
-                <dd className="tabular-nums font-medium">{money(costFor.costFreight || 0)} / sq ft</dd>
+                <dd className="tabular-nums font-medium">{money(costFor.costFreight || 0)} / {unitShort(costFor.unit)}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-zinc-500">Loss</dt>
-                <dd className="tabular-nums font-medium">{money(costFor.costLoss || 0)} / sq ft</dd>
+                <dd className="tabular-nums font-medium">{money(costFor.costLoss || 0)} / {unitShort(costFor.unit)}</dd>
               </div>
               <div className="flex justify-between gap-4 border-t border-zinc-100 pt-2.5">
                 <dt className="font-medium text-zinc-800">Final avg</dt>
-                <dd className="tabular-nums text-base font-semibold">{money(costFor.costPrice)} / sq ft</dd>
+                <dd className="tabular-nums text-base font-semibold">{money(costFor.costPrice)} / {unitShort(costFor.unit)}</dd>
               </div>
             </dl>
             <div className="flex justify-end border-t border-zinc-100 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -737,8 +737,8 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-2 gap-2 border-b border-zinc-200 bg-zinc-50/80 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 sm:grid-cols-4">
               {[
-                ["Stock", sqft(edit.stock)],
-                ["Avg cost", `${money(edit.costPrice)}/ft`],
+                ["Stock", sqft(edit.stock, edit.unit)],
+                ["Avg cost", `${money(edit.costPrice)}/${unitShort(edit.unit)}`],
                 ["Cost value", money(edit.stock * edit.costPrice)],
                 ["Retail value", money(edit.stock * edit.sellPrice)],
               ].map(([label, value]) => (
@@ -757,7 +757,7 @@ export default function InventoryPage() {
                     <p className="tabular-nums font-bold text-zinc-900">{myPct.toFixed(1)}%</p>
                   </div>
                   <p className="mt-1 text-sm text-zinc-600">
-                    {sqft((myPct / 100) * edit.stock)} · {money((myPct / 100) * edit.stock * edit.costPrice)}
+                    {sqft((myPct / 100) * edit.stock, edit.unit)} · {money((myPct / 100) * edit.stock * edit.costPrice)}
                   </p>
                 </div>
                 {shares.map((s) => (
@@ -767,7 +767,7 @@ export default function InventoryPage() {
                       <p className="shrink-0 tabular-nums font-bold">{s.percent.toFixed(1)}%</p>
                     </div>
                     <p className="mt-1 text-sm text-zinc-600">
-                      {sqft((s.percent / 100) * edit.stock)} · {money((s.percent / 100) * edit.stock * edit.costPrice)}
+                      {sqft((s.percent / 100) * edit.stock, edit.unit)} · {money((s.percent / 100) * edit.stock * edit.costPrice)}
                     </p>
                   </div>
                 ))}
@@ -777,7 +777,7 @@ export default function InventoryPage() {
                     <span className="tabular-nums">{(myPct + partnerSum).toFixed(1)}%</span>
                   </div>
                   <p className="mt-1 text-sm font-semibold text-zinc-700">
-                    {sqft(edit.stock)} · {money(edit.stock * edit.costPrice)}
+                    {sqft(edit.stock, edit.unit)} · {money(edit.stock * edit.costPrice)}
                   </p>
                 </div>
               </div>
@@ -798,7 +798,7 @@ export default function InventoryPage() {
                     <tr className="border-t border-zinc-100">
                       <td className="px-3 py-2.5 font-semibold text-zinc-900">You</td>
                       <td className="px-3 py-2.5 tabular-nums font-medium">{myPct.toFixed(1)}%</td>
-                      <td className="px-3 py-2.5 tabular-nums">{sqft((myPct / 100) * edit.stock)}</td>
+                      <td className="px-3 py-2.5 tabular-nums">{sqft((myPct / 100) * edit.stock, edit.unit)}</td>
                       <td className="px-3 py-2.5 tabular-nums">{money((myPct / 100) * edit.stock * edit.costPrice)}</td>
                       <td className="px-3 py-2.5 tabular-nums">{money((myPct / 100) * edit.stock * edit.sellPrice)}</td>
                     </tr>
@@ -806,7 +806,7 @@ export default function InventoryPage() {
                       <tr key={s.partnerId} className="border-t border-zinc-100">
                         <td className="px-3 py-2.5 font-medium text-zinc-800">{partnerName(s.partnerId)}</td>
                         <td className="px-3 py-2.5 tabular-nums font-medium">{s.percent.toFixed(1)}%</td>
-                        <td className="px-3 py-2.5 tabular-nums">{sqft((s.percent / 100) * edit.stock)}</td>
+                        <td className="px-3 py-2.5 tabular-nums">{sqft((s.percent / 100) * edit.stock, edit.unit)}</td>
                         <td className="px-3 py-2.5 tabular-nums">{money((s.percent / 100) * edit.stock * edit.costPrice)}</td>
                         <td className="px-3 py-2.5 tabular-nums">{money((s.percent / 100) * edit.stock * edit.sellPrice)}</td>
                       </tr>
@@ -814,7 +814,7 @@ export default function InventoryPage() {
                     <tr className="border-t-2 border-zinc-200 bg-zinc-50 font-bold">
                       <td className="px-3 py-2.5">Total</td>
                       <td className="px-3 py-2.5 tabular-nums">{(myPct + partnerSum).toFixed(1)}%</td>
-                      <td className="px-3 py-2.5 tabular-nums">{sqft(edit.stock)}</td>
+                      <td className="px-3 py-2.5 tabular-nums">{sqft(edit.stock, edit.unit)}</td>
                       <td className="px-3 py-2.5 tabular-nums">{money(edit.stock * edit.costPrice)}</td>
                       <td className="px-3 py-2.5 tabular-nums">{money(edit.stock * edit.sellPrice)}</td>
                     </tr>
@@ -830,7 +830,7 @@ export default function InventoryPage() {
                   Edit shares
                 </span>
                 <div className="flex gap-1.5">
-                  {([["percent", "%"], ["sqft", "sq ft"], ["amount", "Rs"]] as const).map(([key, label]) => (
+                  {([["percent", "%"], ["sqft", unitSuffix(edit?.unit)], ["amount", "Rs"]] as const).map(([key, label]) => (
                     <button
                       key={key}
                       type="button"
@@ -847,7 +847,7 @@ export default function InventoryPage() {
 
               {unit !== "percent" && (
                 <p className="text-sm text-zinc-600">
-                  Enter in {unit === "sqft" ? "sq ft" : "Rs"}; converted to % for saving.
+                  Enter in {unit === "sqft" ? unitSuffix(edit?.unit) : "Rs"}; converted to % for saving.
                 </p>
               )}
 
@@ -955,7 +955,7 @@ export default function InventoryPage() {
                   <h2 className="text-lg font-bold tracking-tight text-zinc-900 sm:text-xl">Stock history</h2>
                   <p className="mt-0.5 text-sm text-zinc-600 sm:text-base">
                     <span className="font-medium text-zinc-800">{productLabel(hist)}</span>
-                    <span className="block sm:inline"> · {sqft(hist.stock)} · final {money(hist.costPrice)}</span>
+                    <span className="block sm:inline"> · {sqft(hist.stock, hist.unit)} · final {money(hist.costPrice)}</span>
                   </p>
                   {(hist.costFreight > 0 || hist.costLoss > 0) && (
                     <p className="mt-1 text-sm text-zinc-500">
@@ -1017,7 +1017,7 @@ export default function InventoryPage() {
                           <p className="text-sm text-zinc-500">{new Date(e.date).toLocaleString()}</p>
                           {e.kind === "purchase" && e.unitCost != null && (
                             <p className="mt-0.5 text-sm tabular-nums text-zinc-600">
-                              {money(e.unitCost)} / sq ft
+                              {money(e.unitCost)} / {unitShort(hist.unit)}
                               {e.tripId ? " · via trip" : ""}
                             </p>
                           )}
@@ -1031,7 +1031,7 @@ export default function InventoryPage() {
                           }`}
                         >
                           {e.kind === "loss" ? "−" : "+"}
-                          {sqft(e.qty)}
+                          {sqft(e.qty, hist.unit)}
                         </span>
                         {(e.kind === "loss" || e.kind === "surplus") && (
                           <div className="flex gap-1">
@@ -1101,7 +1101,7 @@ export default function InventoryPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-teal-700" aria-hidden>
                     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
                   </svg>
-                  Quantity (sq ft)
+                  {qtyLabel(adjFor?.unit)}
                 </span>
                 <input className="input text-base" type="number" min="0.01" step="0.01" value={adjQty} onChange={(e) => setAdjQty(e.target.value)} required />
               </label>
@@ -1209,7 +1209,7 @@ export default function InventoryPage() {
                           <p className="truncate font-semibold text-zinc-900">{p.name}</p>
                           <p className="font-mono text-sm text-zinc-500">{p.dimension}</p>
                         </div>
-                        <p className="shrink-0 tabular-nums font-bold text-zinc-900">{sqft(p.stock)}</p>
+                        <p className="shrink-0 tabular-nums font-bold text-zinc-900">{sqft(p.stock, p.unit)}</p>
                       </div>
                       <div className="mt-2 space-y-0.5 text-sm text-zinc-600">
                         {ownershipLines(p).map((line) => (
@@ -1233,8 +1233,8 @@ export default function InventoryPage() {
                           <p className="font-bold tabular-nums text-zinc-900">{money(p.stock * p.costPrice)}</p>
                           {(adj.loss > 0 || adj.surplus > 0) && (
                             <div className="mt-0.5 space-y-0.5 text-xs">
-                              {adj.loss > 0 && <p className="font-semibold text-red-700">−{sqft(adj.loss)}</p>}
-                              {adj.surplus > 0 && <p className="font-semibold text-emerald-700">+{sqft(adj.surplus)}</p>}
+                              {adj.loss > 0 && <p className="font-semibold text-red-700">−{sqft(adj.loss, p.unit)}</p>}
+                              {adj.surplus > 0 && <p className="font-semibold text-emerald-700">+{sqft(adj.surplus, p.unit)}</p>}
                             </div>
                           )}
                         </div>
@@ -1286,7 +1286,7 @@ export default function InventoryPage() {
                             <p className="font-semibold text-zinc-900">{p.name}</p>
                             <p className="mt-0.5 font-mono text-sm text-zinc-500">{p.dimension}</p>
                           </td>
-                          <td className="px-4 py-3.5 align-top tabular-nums font-semibold text-zinc-900">{sqft(p.stock)}</td>
+                          <td className="px-4 py-3.5 align-top tabular-nums font-semibold text-zinc-900">{sqft(p.stock, p.unit)}</td>
                           <td className="px-4 py-3.5 align-top">
                             <ul className="space-y-1 text-sm leading-snug text-zinc-700">
                               {ownershipLines(p).map((line) => (
@@ -1308,8 +1308,8 @@ export default function InventoryPage() {
                           <td className="px-4 py-3.5 align-top text-sm tabular-nums">
                             {adj.loss || adj.surplus ? (
                               <div className="space-y-0.5">
-                                {adj.loss > 0 && <p className="font-semibold text-red-700">−{sqft(adj.loss)}</p>}
-                                {adj.surplus > 0 && <p className="font-semibold text-emerald-700">+{sqft(adj.surplus)}</p>}
+                                {adj.loss > 0 && <p className="font-semibold text-red-700">−{sqft(adj.loss, p.unit)}</p>}
+                                {adj.surplus > 0 && <p className="font-semibold text-emerald-700">+{sqft(adj.surplus, p.unit)}</p>}
                               </div>
                             ) : (
                               <span className="text-zinc-400">—</span>

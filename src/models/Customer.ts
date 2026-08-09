@@ -5,6 +5,7 @@ const CustomerSchema = new Schema(
     userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
+    arrears: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

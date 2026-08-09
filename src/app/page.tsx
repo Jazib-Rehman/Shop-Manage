@@ -248,7 +248,7 @@ export default function DashboardPage() {
     );
   }
 
-  const s = calcStats(shop.products, shop.sales, shop.purchases);
+  const s = calcStats(shop.products, shop.sales, shop.purchases, shop.customers);
   const days = lastNDays(14);
   const salesByDay = days.map((d) =>
     shop.sales.filter((x) => dayKey(x.date) === d).reduce((sum, x) => sum + x.total, 0)
@@ -407,7 +407,7 @@ export default function DashboardPage() {
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800 sm:h-10 sm:w-10">
                   <Icon>{I.tiles}</Icon>
                 </span>
-                <h2 className="text-base font-bold text-zinc-900 sm:text-lg">Top stock (sq ft)</h2>
+                <h2 className="text-base font-bold text-zinc-900 sm:text-lg">Top stock</h2>
               </div>
               <Link
                 href="/inventory"
@@ -425,7 +425,7 @@ export default function DashboardPage() {
                   <li key={p.id}>
                     <div className="mb-1.5 flex justify-between gap-3 text-sm sm:text-base">
                       <span className="truncate font-medium text-zinc-900">{productLabel(p)}</span>
-                      <span className="shrink-0 tabular-nums font-bold text-zinc-800">{sqft(p.stock)}</span>
+                      <span className="shrink-0 tabular-nums font-bold text-zinc-800">{sqft(p.stock, p.unit)}</span>
                     </div>
                     <div className="h-2.5 overflow-hidden rounded-full bg-zinc-200">
                       <div
@@ -507,7 +507,7 @@ export default function DashboardPage() {
             {s.lowStock.map((p) => (
               <li key={p.id} className="flex justify-between gap-3 px-4 py-3.5 text-base">
                 <span className="font-semibold text-zinc-900">{productLabel(p)}</span>
-                <span className="tabular-nums font-bold text-amber-950">{sqft(p.stock)} left</span>
+                <span className="tabular-nums font-bold text-amber-950">{sqft(p.stock, p.unit)} left</span>
               </li>
             ))}
           </ul>

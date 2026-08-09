@@ -52,6 +52,14 @@ const I = {
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </>
   ),
+  sizes: (
+    <>
+      <path d="M21 8H3" />
+      <path d="M21 16H3" />
+      <path d="M8 4v16" />
+      <path d="M16 4v16" />
+    </>
+  ),
   operations: (
     <>
       <circle cx="12" cy="12" r="3" />
@@ -126,6 +134,7 @@ const groups = [
     icon: I.inventory,
     links: [
       { href: "/inventory", label: "Stock & costs", icon: I.stock },
+      { href: "/sizes", label: "Sizes", icon: I.sizes },
       { href: "/catalog", label: "Marble catalog", icon: I.catalog },
     ],
   },

@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAlert } from "@/components/Alert";
-import { money, sqft } from "@/lib/calc";
+import { money, sqft, unitShort } from "@/lib/calc";
 import { freightPerSqFt, freightShare, lineTons, ratePerTon } from "@/lib/freight";
 import { useShop } from "@/lib/store";
 import type { Purchase, Trip } from "@/lib/types";
@@ -26,7 +26,7 @@ function PurchaseSearchSelect({
   selectedIds: string[];
   onToggle: (id: string) => void;
   onSetAll: (ids: string[], on: boolean) => void;
-  products: { id: string; name: string; dimension: string; sqFtPerTon?: number }[];
+  products: { id: string; name: string; dimension: string; sqFtPerTon?: number; unit?: "sqft" | "piece" }[];
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -36,8 +36,9 @@ function PurchaseSearchSelect({
     const prod = products.find((x) => x.id === p.productId);
     return {
       name: prod ? productLabel(prod) : "—",
-      qty: sqft(p.qty),
+      qty: sqft(p.qty, prod?.unit),
       rate: money(p.unitCost),
+      unit: prod?.unit,
       total: money(p.total),
     };
   };
@@ -135,7 +136,7 @@ function PurchaseSearchSelect({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-base font-semibold text-zinc-900">{m.name}</span>
                   <span className="mt-0.5 block text-sm tabular-nums text-zinc-600">
-                    {m.qty} · {m.rate}/ft
+                    {m.qty} · {m.rate}/{unitShort(m.unit)}
                   </span>
                 </span>
                 <span className="shrink-0 text-base font-semibold tabular-nums text-zinc-800">{m.total}</span>
@@ -577,8 +578,8 @@ export default function TripsPage() {
                             <p className="shrink-0 tabular-nums font-bold text-zinc-900">{money(l.total + freightTotal)}</p>
                           </div>
                           <p className="mt-1 text-xs tabular-nums text-zinc-600">
-                            {sqft(l.qty)} · {tons.toFixed(3)} t · {money(l.unitCost)}/ft
-                            {freightFt > 0 && <> · frt {money(freightFt)}/ft</>}
+                            {sqft(l.qty, prod?.unit)} · {tons.toFixed(3)} t · {money(l.unitCost)}/{unitShort(prod?.unit)}
+                            {freightFt > 0 && <> · frt {money(freightFt)}/{unitShort(prod?.unit)}</>}
                           </p>
                         </li>
                       );
@@ -677,8 +678,8 @@ export default function TripsPage() {
                                   <th className="px-3 py-2.5">Marble</th>
                                   <th className="px-3 py-2.5">Qty</th>
                                   <th className="px-3 py-2.5">Tons</th>
-                                  <th className="px-3 py-2.5">Price / ft</th>
-                                  <th className="px-3 py-2.5">Freight / ft</th>
+                                  <th className="px-3 py-2.5">Price</th>
+                                  <th className="px-3 py-2.5">Freight</th>
                                   <th className="px-3 py-2.5">Line + freight</th>
                                 </tr>
                               </thead>
@@ -695,10 +696,10 @@ export default function TripsPage() {
                                         <p className="font-semibold text-zinc-900">{prod?.name ?? nameOf(l.productId)}</p>
                                         {prod && <p className="font-mono text-sm text-zinc-500">{prod.dimension}</p>}
                                       </td>
-                                      <td className="px-3 py-2.5 tabular-nums font-semibold">{sqft(l.qty)}</td>
+                                      <td className="px-3 py-2.5 tabular-nums font-semibold">{sqft(l.qty, prod?.unit)}</td>
                                       <td className="px-3 py-2.5 tabular-nums text-zinc-600">{tons.toFixed(3)}</td>
-                                      <td className="px-3 py-2.5 tabular-nums">{money(l.unitCost)}</td>
-                                      <td className="px-3 py-2.5 tabular-nums text-zinc-600">{money(freightFt)}</td>
+                                      <td className="px-3 py-2.5 tabular-nums">{money(l.unitCost)}/{unitShort(prod?.unit)}</td>
+                                      <td className="px-3 py-2.5 tabular-nums text-zinc-600">{freightFt > 0 ? `${money(freightFt)}/${unitShort(prod?.unit)}` : "—"}</td>
                                       <td className="px-3 py-2.5 tabular-nums font-bold">{money(l.total + freightTotal)}</td>
                                     </tr>
                                   );
@@ -847,8 +848,8 @@ export default function TripsPage() {
                                   {prod ? productLabel(prod) : "—"}
                                 </p>
                                 <p className="mt-0.5 text-sm tabular-nums text-teal-800/80">
-                                  {sqft(p.qty)} · {money(p.total)}
-                                  {freightFt > 0 && <> · frt {money(freightFt)}/ft</>}
+                                  {sqft(p.qty, prod?.unit)} · {money(p.total)}
+                                  {freightFt > 0 && <> · frt {money(freightFt)}/{unitShort(prod?.unit)}</>}
                                 </p>
                               </div>
                               <button

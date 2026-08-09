@@ -104,6 +104,11 @@ export async function DELETE(_req: Request, { params }: Ctx) {
       shares,
       label: product ? `${product.name} · ${product.dimension}` : "Purchase",
     });
+    await PartnerLedger.deleteMany({
+      userId,
+      purchaseId: String(line._id),
+      type: "freight_share",
+    });
   }
 
   for (const pid of productIds) await recalcProduct(pid);

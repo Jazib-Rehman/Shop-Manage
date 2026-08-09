@@ -5,7 +5,7 @@ import { toPng } from "html-to-image";
 import { useAlert } from "@/components/Alert";
 import { ProductSearchSelect } from "@/components/ProductSearchSelect";
 import { CustomerSelect } from "@/components/CustomerSelect";
-import { money, sqft } from "@/lib/calc";
+import { costPerLabel, money, pricePerLabel, profitPerLabel, qtyLabel, sqft, unitSuffix } from "@/lib/calc";
 import {
   allocDisplay,
   allocFromInput,
@@ -37,7 +37,7 @@ const statusLabel: Record<PaymentStatus, string> = {
 
 export default function SalesPage() {
   const shop = useShop();
-  const { alert, confirm } = useAlert();
+  const { alert, confirm, toast } = useAlert();
   const [open, setOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState<Sale | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
@@ -235,7 +235,7 @@ export default function SalesPage() {
     const price = Number(unitPrice);
     if (!productId || q <= 0 || price < 0) return;
     if (!editId && q > available) {
-      setError(`Only ${sqft(available)} available`);
+      setError(`Only ${sqft(available, selected?.unit)} available`);
       return;
     }
     setSaving(true);
@@ -282,7 +282,7 @@ export default function SalesPage() {
   };
 
   const onDelete = async (r: Sale) => {
-    if (!(await confirm(`Delete sale of ${sqft(r.qty)}?`))) return;
+    if (!(await confirm(`Delete sale of ${sqft(r.qty, productOf(r.productId)?.unit)}?`))) return;
     try {
       await shop.deleteSale(r.id);
     } catch (err) {
@@ -364,12 +364,77 @@ export default function SalesPage() {
             </p>
           </div>
         </div>
-        <button type="button" className="btn w-full justify-center text-base sm:w-auto" disabled={!shop.products.length} onClick={openCreate}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 h-5 w-5" aria-hidden>
-            <path d="M12 5v14" /><path d="M5 12h14" />
-          </svg>
-          New sale
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            className="inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-base font-semibold text-zinc-800 ring-1 ring-zinc-300 hover:bg-zinc-50 disabled:opacity-40 sm:w-auto"
+            disabled={rows.length === 0}
+            onClick={async () => {
+              const cell = (v: string | number) =>
+                String(v ?? "").replace(/\t/g, " ").replace(/\r?\n/g, " ");
+              const header = [
+                "Date",
+                "Marble",
+                "Size",
+                "Unit",
+                "Customer",
+                "Qty",
+                "Unit price",
+                "Cost / unit",
+                "Profit / unit",
+                "Total",
+                "Cost",
+                "Profit",
+                "Margin %",
+                "Paid",
+                "Due",
+                "Status",
+                "Due date",
+                "Description",
+              ];
+              const lines = rows.map((r) => {
+                const prod = products.find((p) => p.id === r.productId);
+                const cust = customers.find((c) => c.id === r.customerId);
+                const costPer = r.qty > 0 ? r.costTotal / r.qty : 0;
+                const profitPer = r.qty > 0 ? r.profit / r.qty : 0;
+                const margin = r.total > 0 ? (r.profit / r.total) * 100 : 0;
+                const due = remainingBalance(r.total, r.amountPaid || 0);
+                return [
+                  r.date.slice(0, 10),
+                  prod?.name ?? "",
+                  prod?.dimension ?? "",
+                  prod?.unit === "piece" ? "piece" : "sq ft",
+                  cust?.name ?? "",
+                  r.qty,
+                  r.unitPrice,
+                  Number(costPer.toFixed(4)),
+                  Number(profitPer.toFixed(4)),
+                  r.total,
+                  r.costTotal,
+                  r.profit,
+                  Number(margin.toFixed(2)),
+                  r.amountPaid || 0,
+                  due,
+                  r.paymentStatus,
+                  r.dueDate ? r.dueDate.slice(0, 10) : "",
+                  r.description || "",
+                ]
+                  .map(cell)
+                  .join("\t");
+              });
+              await navigator.clipboard.writeText([header.map(cell).join("\t"), ...lines].join("\n"));
+              toast(`Copied ${rows.length} sales`, "success");
+            }}
+          >
+            Copy CSV
+          </button>
+          <button type="button" className="btn w-full justify-center text-base sm:w-auto" disabled={!shop.products.length} onClick={openCreate}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 h-5 w-5" aria-hidden>
+              <path d="M12 5v14" /><path d="M5 12h14" />
+            </svg>
+            New sale
+          </button>
+        </div>
       </div>
 
       {outstanding.length > 0 && (
@@ -739,7 +804,7 @@ export default function SalesPage() {
                       Marble · size
                     </span>
                     <ProductSearchSelect products={shop.products.filter((p) => p.stock > 0)} value={productId} onChange={onProduct} placeholder="Select marble · size…" />
-                    {selected && <span className="text-sm text-zinc-600">{sqft(available)} available</span>}
+                    {selected && <span className="text-sm text-zinc-600">{sqft(available, selected.unit)} available</span>}
                   </label>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -748,7 +813,7 @@ export default function SalesPage() {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-teal-700" aria-hidden>
                           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
                         </svg>
-                        Qty (sq ft)
+                        {qtyLabel(selected?.unit)}
                       </span>
                       <input
                         className="input text-base"
@@ -770,7 +835,7 @@ export default function SalesPage() {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-teal-700" aria-hidden>
                           <path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                         </svg>
-                        Price / ft
+                        {pricePerLabel(selected?.unit)}
                       </span>
                       <input className="input text-base" type="number" min="0" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} required />
                     </label>
@@ -787,7 +852,7 @@ export default function SalesPage() {
                           Sold from whose share?
                         </legend>
                         <div className="flex gap-1.5">
-                          {([["percent", "%"], ["sqft", "sq ft"], ["amount", "Rs"]] as const).map(([key, label]) => (
+                          {([["percent", "%"], ["sqft", unitSuffix(selected?.unit)], ["amount", "Rs"]] as const).map(([key, label]) => (
                             <button
                               key={key}
                               type="button"
@@ -826,14 +891,14 @@ export default function SalesPage() {
                               }}
                             />
                             <span className="shrink-0 tabular-nums text-sm font-medium text-zinc-600">
-                              {allocUnit !== "sqft" && `${sqft(a.qty)} · `}
+                              {allocUnit !== "sqft" && `${sqft(a.qty, selected?.unit)} · `}
                               {money(a.qty * priceNum)}
                             </span>
                           </label>
                         );
                       })}
                       <p className={`text-sm font-semibold ${Math.abs(allocations.reduce((s, a) => s + a.qty, 0) - qNum) > 0.02 ? "text-red-700" : "text-zinc-600"}`}>
-                        Allocated {sqft(allocations.reduce((s, a) => s + a.qty, 0))} / {sqft(qNum)}
+                        Allocated {sqft(allocations.reduce((s, a) => s + a.qty, 0), selected?.unit)} / {sqft(qNum, selected?.unit)}
                       </p>
                     </fieldset>
                   )}
@@ -842,7 +907,7 @@ export default function SalesPage() {
 
               {editId && (
                 <p className="rounded-xl bg-zinc-50 px-4 py-3 text-base font-semibold text-zinc-800 ring-1 ring-zinc-200">
-                  {nameOf(productId)} · {sqft(qNum)} · {money(revenue)}
+                  {nameOf(productId)} · {sqft(qNum, selected?.unit)} · {money(revenue)}
                 </p>
               )}
 
@@ -942,7 +1007,7 @@ export default function SalesPage() {
                     <div className="flex justify-between gap-4"><dt className="text-zinc-700">Balance due</dt><dd className="font-semibold tabular-nums text-zinc-900">{money(Math.max(0, revenue - paidNowNum))}</dd></div>
                     <div className="flex justify-between gap-4 border-t border-teal-200/80 pt-2"><dt className="font-bold text-zinc-900">Gross profit</dt><dd className="text-lg font-bold tabular-nums text-emerald-700">{money(profit)}</dd></div>
                     <div className="flex justify-between gap-4"><dt className="text-zinc-700">Margin</dt><dd className="font-semibold tabular-nums text-zinc-900">{margin.toFixed(1)}%</dd></div>
-                    {selected && <div className="flex justify-between gap-4"><dt className="text-zinc-700">Stock after</dt><dd className="font-semibold tabular-nums text-zinc-900">{sqft(Math.max(0, stockAfter))}</dd></div>}
+                    {selected && <div className="flex justify-between gap-4"><dt className="text-zinc-700">Stock after</dt><dd className="font-semibold tabular-nums text-zinc-900">{sqft(Math.max(0, stockAfter), selected.unit)}</dd></div>}
                   </dl>
                 </div>
               )}
@@ -1047,11 +1112,11 @@ export default function SalesPage() {
                   <h3 className="mb-2 text-base font-bold text-zinc-900">Sale breakdown</h3>
                   {row("Date", new Date(r.date).toLocaleString())}
                   {row("Customer", customerOf(r.customerId))}
-                  {row("Qty", sqft(r.qty))}
+                  {row("Qty", sqft(r.qty, prod?.unit))}
                   {row("Unit price", money(r.unitPrice))}
-                  {row("Cost / sq ft", money(r.qty > 0 ? r.costTotal / r.qty : 0))}
+                  {row(costPerLabel(prod?.unit), money(r.qty > 0 ? r.costTotal / r.qty : 0))}
                   {row("Cost", money(r.costTotal))}
-                  {row("Profit / sq ft", money(profitPerSqFt))}
+                  {row(profitPerLabel(prod?.unit), money(profitPerSqFt))}
                   {row("Margin", `${r.total > 0 ? ((r.profit / r.total) * 100).toFixed(1) : "0.0"}%`)}
                   {row("Paid", money(r.amountPaid || 0))}
                   {row("Due", money(due))}
@@ -1075,7 +1140,7 @@ export default function SalesPage() {
                           <div>
                             <p className="text-lg font-bold text-zinc-900">{d.partner?.name ?? "You (owner)"}</p>
                             <p className="text-sm text-zinc-600">
-                              {sqft(d.qty)} · {r.qty > 0 ? ((d.qty / r.qty) * 100).toFixed(1) : "0.0"}% of sale
+                              {sqft(d.qty, prod?.unit)} · {r.qty > 0 ? ((d.qty / r.qty) * 100).toFixed(1) : "0.0"}% of sale
                             </p>
                           </div>
                           <p className="text-lg font-bold tabular-nums text-emerald-700">{money(d.income)}</p>

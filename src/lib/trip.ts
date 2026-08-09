@@ -1,5 +1,5 @@
 import { freightPerSqFt, ratePerTon } from "@/lib/freight";
-import { syncPurchaseLedger } from "@/lib/partner-ledger";
+import { syncFreightLedger, syncPurchaseLedger } from "@/lib/partner-ledger";
 import { recalcProduct } from "@/lib/recalc-product";
 import { PartnerLedger } from "@/models/PartnerLedger";
 import { Product } from "@/models/Product";
@@ -25,6 +25,7 @@ export async function recomputeTrip(tripId: string) {
     dimension: string;
     sqFtPerTon?: number;
     tonsPerSqFt?: number;
+    shares?: { partnerId: unknown; percent: number }[];
   }[]>();
   const productById = new Map(products.map((p) => [String(p._id), p]));
   const freightFor = (line: { productId: unknown }) =>
@@ -37,9 +38,7 @@ export async function recomputeTrip(tripId: string) {
       purchaseId: String(line._id),
       type: "purchase_share",
     }).lean();
-    const product = productById.get(String(line.productId)) as
-      | { name: string; dimension: string; shares?: { partnerId: unknown; percent: number }[] }
-      | undefined;
+    const product = productById.get(String(line.productId));
     const shares = (
       existing.length
         ? existing.map((e) => ({
@@ -51,14 +50,25 @@ export async function recomputeTrip(tripId: string) {
             percent: s.percent,
           }))
     ).filter((s) => s.partnerId && s.percent > 0);
+    const label = product ? `${product.name} · ${product.dimension}` : "Trip line";
+    const freightPerUnit = freightFor(line);
     await syncPurchaseLedger({
       userId: String(trip.userId),
       purchaseId: String(line._id),
       productId: String(line.productId),
       qty: line.qty,
-      unitCost: line.unitCost + freightFor(line),
+      unitCost: line.unitCost,
       shares,
-      label: product ? `${product.name} · ${product.dimension}` : "Trip line",
+      label,
+    });
+    await syncFreightLedger({
+      userId: String(trip.userId),
+      purchaseId: String(line._id),
+      productId: String(line.productId),
+      qty: line.qty,
+      freightPerUnit,
+      shares,
+      label,
     });
   }
 }

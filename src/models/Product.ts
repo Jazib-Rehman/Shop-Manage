@@ -12,8 +12,10 @@ const ProductSchema = new Schema(
   {
     userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     marbleId: { type: Types.ObjectId, ref: "Marble", required: true },
+    sizeId: { type: Types.ObjectId, ref: "Size", default: null },
     name: { type: String, required: true },
     dimension: { type: String, required: true },
+    unit: { type: String, enum: ["sqft", "piece"], default: "sqft" },
     tonsPerSqFt: { type: Number, default: 0, min: 0 },
     sqFtPerTon: { type: Number, default: 0, min: 0 },
     sku: { type: String, required: true },

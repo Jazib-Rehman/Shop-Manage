@@ -1,52 +1,100 @@
+import { Marble } from "@/models/Marble";
 import { Product } from "@/models/Product";
+
+export type SizeLike = {
+  id: string;
+  label: string;
+  unit: "sqft" | "piece";
+  sqFtPerTon: number;
+};
 
 export function skuFor(name: string, dimension: string) {
   return `${name} · ${dimension}`;
 }
 
-/** Keep one stock SKU per marble × dimension. */
+/** Keep one stock SKU per marble × size. */
 export async function syncMarbleProducts(
   userId: string,
   marbleId: string,
   name: string,
-  dimensions: string[],
-  dimensionWeights: { dimension: string; sqFtPerTon: number }[] = []
+  sizes: SizeLike[]
 ) {
-  const dims = [...new Set(dimensions.map((d) => d.trim()).filter(Boolean))];
-  const weightOf = (dimension: string) =>
-    Math.max(
-      0,
-      Number(dimensionWeights.find((w) => w.dimension === dimension)?.sqFtPerTon) || 0
-    );
+  const list = sizes.filter((s) => s.label.trim());
   const existing = await Product.find({ marbleId, userId }).lean();
 
-  for (const dimension of dims) {
-    const found = existing.find((p) => p.dimension === dimension);
-    const sqFtPerTon = weightOf(dimension);
+  for (const size of list) {
+    const found =
+      existing.find((p) => String((p as { sizeId?: unknown }).sizeId || "") === size.id) ||
+      existing.find((p) => p.dimension === size.label);
+    const payload = {
+      name,
+      dimension: size.label,
+      sizeId: size.id,
+      unit: size.unit,
+      sqFtPerTon: Math.max(0, Number(size.sqFtPerTon) || 0),
+      sku: skuFor(name, size.label),
+    };
     if (found) {
-      await Product.collection.updateOne(
-        { _id: found._id, userId },
-        { $set: { name, sqFtPerTon, sku: skuFor(name, dimension) } }
-      );
+      await Product.updateOne({ _id: found._id, userId }, { $set: payload });
     } else {
       await Product.create({
         userId,
         marbleId,
-        name,
-        dimension,
-        sqFtPerTon,
-        sku: skuFor(name, dimension),
+        ...payload,
         stock: 0,
       });
     }
   }
 
-  const keep = new Set(dims);
+  const keep = new Set(list.map((s) => s.id));
+  const keepLabels = new Set(list.map((s) => s.label));
   for (const p of existing) {
-    if (!keep.has(p.dimension) && p.stock === 0) {
+    const sid = String((p as { sizeId?: unknown }).sizeId || "");
+    const linked = sid ? keep.has(sid) : keepLabels.has(p.dimension);
+    if (!linked && p.stock === 0) {
       await Product.deleteOne({ _id: p._id, userId });
     }
   }
 
-  return dims;
+  return {
+    sizeIds: list.map((s) => s.id),
+    dimensions: list.map((s) => s.label),
+    dimensionWeights: list.map((s) => ({
+      dimension: s.label,
+      sqFtPerTon: Math.max(0, Number(s.sqFtPerTon) || 0),
+    })),
+  };
+}
+
+/** Cascade size label into linked products/SKU only — unit/weight stay on Size (display source). */
+export async function cascadeSizeChange(userId: string, size: SizeLike) {
+  const products = await Product.find({ userId, sizeId: size.id }).lean();
+  for (const p of products) {
+    await Product.updateOne(
+      { _id: p._id, userId },
+      { $set: { dimension: size.label, sku: skuFor(p.name, size.label) } }
+    );
+  }
+
+  const marbles = await Marble.find({ userId, sizeIds: size.id }).lean();
+  for (const m of marbles) {
+    const marbleProducts = await Product.find({ userId, marbleId: m._id })
+      .sort({ dimension: 1 })
+      .lean();
+    await Marble.updateOne(
+      { _id: m._id, userId },
+      {
+        $set: {
+          dimensions: marbleProducts.map((p) => p.dimension),
+          dimensionWeights: marbleProducts.map((p) => ({
+            dimension: p.dimension,
+            sqFtPerTon:
+              p.dimension === size.label
+                ? Math.max(0, Number(size.sqFtPerTon) || 0)
+                : Number(p.sqFtPerTon) || 0,
+          })),
+        },
+      }
+    );
+  }
 }

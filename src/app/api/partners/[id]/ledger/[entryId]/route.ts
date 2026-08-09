@@ -6,7 +6,8 @@ import { PartnerLedger } from "@/models/PartnerLedger";
 
 type Ctx = { params: Promise<{ id: string; entryId: string }> };
 
-const MANUAL = new Set(["investment", "payout", "adjustment"]);
+const EDITABLE = new Set(["payout", "adjustment"]);
+const DELETABLE = new Set(["investment", "payout", "adjustment"]);
 
 export async function PATCH(req: Request, { params }: Ctx) {
   const userId = await requireUser();
@@ -15,13 +16,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { id, entryId } = await params;
   const doc = await PartnerLedger.findOne({ _id: entryId, userId, partnerId: id });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!MANUAL.has(doc.type)) {
-    return NextResponse.json({ error: "Only investment / payout / adjustment can be edited" }, { status: 400 });
+  if (!EDITABLE.has(doc.type)) {
+    return NextResponse.json({ error: "Only payout / adjustment can be edited" }, { status: 400 });
   }
 
   const body = await req.json();
   if (body.type != null) {
-    if (!MANUAL.has(body.type)) {
+    if (!EDITABLE.has(body.type)) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
     doc.type = body.type;
@@ -43,8 +44,8 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   const { id, entryId } = await params;
   const doc = await PartnerLedger.findOne({ _id: entryId, userId, partnerId: id });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!MANUAL.has(doc.type)) {
-    return NextResponse.json({ error: "Only investment / payout / adjustment can be deleted" }, { status: 400 });
+  if (!DELETABLE.has(doc.type)) {
+    return NextResponse.json({ error: "Only payout / adjustment / legacy investment can be deleted" }, { status: 400 });
   }
   await doc.deleteOne();
   return NextResponse.json({ ok: true });

@@ -4,6 +4,7 @@ const MarbleSchema = new Schema(
   {
     userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     name: { type: String, required: true, trim: true },
+    sizeIds: [{ type: Types.ObjectId, ref: "Size" }],
     dimensions: [{ type: String, trim: true }],
     dimensionWeights: {
       type: [

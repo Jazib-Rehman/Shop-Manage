@@ -25,6 +25,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
     }
     doc.phone = phone;
   }
+  if (body.arrears != null) {
+    doc.arrears = Math.max(0, Number(body.arrears) || 0);
+  }
   if (!doc.name || !doc.phone) {
     return NextResponse.json({ error: "Name and phone required" }, { status: 400 });
   }

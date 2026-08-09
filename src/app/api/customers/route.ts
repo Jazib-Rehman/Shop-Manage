@@ -16,12 +16,13 @@ export async function POST(req: Request) {
   const userId = await requireUser();
   if (!isAuthed(userId)) return userId;
   await db();
-  const { name, phone } = await req.json();
+  const { name, phone, arrears } = await req.json();
   if (!name?.trim() || !phone?.trim()) {
     return NextResponse.json({ error: "Name and phone required" }, { status: 400 });
   }
   const phoneNorm = String(phone).trim();
   const nameNorm = String(name).trim();
+  const arrearsNum = Math.max(0, Number(arrears) || 0);
   const existing = await Customer.findOne({ userId, phone: phoneNorm });
   if (existing) {
     return NextResponse.json(
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     userId,
     name: nameNorm,
     phone: phoneNorm,
+    arrears: arrearsNum,
   });
   return NextResponse.json(mapCustomer(doc), { status: 201 });
 }

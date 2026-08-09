@@ -30,6 +30,16 @@ export function mapCustomer(d: any) {
     id: String(d._id),
     name: d.name,
     phone: d.phone,
+    arrears: Math.max(0, Number(d.arrears) || 0),
+  };
+}
+
+export function mapSize(d: any) {
+  return {
+    id: String(d._id),
+    label: d.label,
+    unit: (d.unit === "piece" ? "piece" : "sqft") as "sqft" | "piece",
+    sqFtPerTon: Number(d.sqFtPerTon) || 0,
   };
 }
 
@@ -37,6 +47,7 @@ export function mapMarble(d: any) {
   return {
     id: String(d._id),
     name: d.name,
+    sizeIds: (d.sizeIds ?? []).map((x: any) => String(x)),
     dimensions: d.dimensions ?? [],
     dimensionWeights: (d.dimensionWeights ?? []).map((w: any) => ({
       dimension: w.dimension,
@@ -54,8 +65,10 @@ export function mapProduct(d: any) {
   return {
     id: String(d._id),
     marbleId: String(d.marbleId),
+    sizeId: d.sizeId ? String(d.sizeId) : null,
     name: d.name,
     dimension: d.dimension,
+    unit: (d.unit === "piece" ? "piece" : "sqft") as "sqft" | "piece",
     sqFtPerTon: Number(d.sqFtPerTon ?? d.tonsPerSqFt) || 0,
     sku: d.sku,
     stock: d.stock,

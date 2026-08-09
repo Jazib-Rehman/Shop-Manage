@@ -6,7 +6,17 @@ const PartnerLedgerSchema = new Schema(
     partnerId: { type: Types.ObjectId, ref: "Partner", required: true },
     type: {
       type: String,
-      enum: ["sale_share", "payout", "adjustment", "investment", "purchase_share"],
+      enum: [
+        "sale_share",
+        "payout",
+        "adjustment",
+        "investment",
+        "purchase_share",
+        "freight_share",
+        "loss_share",
+        "surplus_share",
+        "ownership_share",
+      ],
       required: true,
     },
     amount: { type: Number, required: true },
@@ -14,6 +24,7 @@ const PartnerLedgerSchema = new Schema(
     saleId: { type: Types.ObjectId, ref: "Sale", default: null },
     purchaseId: { type: Types.ObjectId, ref: "Purchase", default: null },
     productId: { type: Types.ObjectId, ref: "Product", default: null },
+    stockAdjustmentId: { type: Types.ObjectId, ref: "StockAdjustment", default: null },
     note: { type: String, default: "" },
   },
   { timestamps: true }
@@ -22,6 +33,7 @@ const PartnerLedgerSchema = new Schema(
 PartnerLedgerSchema.index({ partnerId: 1, createdAt: -1 });
 PartnerLedgerSchema.index({ saleId: 1 });
 PartnerLedgerSchema.index({ purchaseId: 1 });
+PartnerLedgerSchema.index({ stockAdjustmentId: 1 });
 
 if (models.PartnerLedger) delete models.PartnerLedger;
 

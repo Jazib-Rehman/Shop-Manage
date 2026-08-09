@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthed, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { mapProduct } from "@/lib/map";
+import { clearAdjustmentLedger, syncAdjustmentLedger } from "@/lib/partner-ledger";
 import { recalcProduct } from "@/lib/recalc-product";
 import { Product } from "@/models/Product";
 import { StockAdjustment } from "@/models/StockAdjustment";
@@ -38,6 +39,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: r.error }, { status: 400 });
   }
 
+  const refreshed = await Product.findOne({ _id: id, userId }).lean();
+  await syncAdjustmentLedger({
+    userId,
+    adjustmentId: String(adj._id),
+    productId: id,
+    type: adj.type as "loss" | "surplus",
+    qty: adj.qty,
+    unitCost: Number(refreshed?.costPrice) || Number(product.costPrice) || 0,
+    label: `${product.name} · ${product.dimension}`,
+  });
+
   return NextResponse.json({
     adjustment: {
       id: String(adj._id),
@@ -62,6 +74,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
 
   const snap = adj.toObject();
   await adj.deleteOne();
+  await clearAdjustmentLedger(adjId, userId);
   const r = await recalcProduct(id);
   if (r?.error) {
     await StockAdjustment.create(snap);

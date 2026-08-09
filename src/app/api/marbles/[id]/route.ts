@@ -2,26 +2,32 @@ import { NextResponse } from "next/server";
 import { isAuthed, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { mapMarble } from "@/lib/map";
-import { syncMarbleProducts } from "@/lib/marble-sync";
+import { syncMarbleProducts, type SizeLike } from "@/lib/marble-sync";
 import { recomputeTrip } from "@/lib/trip";
 import { Marble } from "@/models/Marble";
 import { Product } from "@/models/Product";
 import { Purchase } from "@/models/Purchase";
+import { Size } from "@/models/Size";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function normalizeWeights(
-  dimensions: string[],
-  dimensionWeights: { dimension?: string; sqFtPerTon?: number; tonsPerSqFt?: number }[]
-) {
-  return dimensions.map((dimension) => ({
-    dimension,
-    sqFtPerTon:
-      Number(
-        dimensionWeights.find((w) => w.dimension === dimension)?.sqFtPerTon ??
-          dimensionWeights.find((w) => w.dimension === dimension)?.tonsPerSqFt
-      ) || 0,
-  }));
+async function resolveSizes(userId: string, sizeIds: string[]): Promise<SizeLike[] | NextResponse> {
+  const ids = [...new Set(sizeIds.map(String).filter(Boolean))];
+  if (!ids.length) return [];
+  const rows = await Size.find({ userId, _id: { $in: ids } }).lean();
+  if (rows.length !== ids.length) {
+    return NextResponse.json({ error: "One or more sizes not found" }, { status: 400 });
+  }
+  const byId = new Map(rows.map((r) => [String(r._id), r]));
+  return ids.map((id) => {
+    const r = byId.get(id)!;
+    return {
+      id,
+      label: r.label,
+      unit: (r.unit === "piece" ? "piece" : "sqft") as "sqft" | "piece",
+      sqFtPerTon: Number(r.sqFtPerTon) || 0,
+    };
+  });
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {
@@ -33,22 +39,28 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const doc = await Marble.findOne({ _id: id, userId }).lean();
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const name =
-    body.name != null ? String(body.name).trim() : String(doc.name);
-  const dimensions: string[] = body.dimensions ?? doc.dimensions ?? [];
-  const sourceWeights = body.dimensionWeights ?? doc.dimensionWeights ?? [];
-  const weights = normalizeWeights(dimensions, sourceWeights);
-  if (weights.some((w) => w.sqFtPerTon <= 0)) {
-    return NextResponse.json(
-      { error: "Enter sq ft / ton for every dimension" },
-      { status: 400 }
-    );
+  const name = body.name != null ? String(body.name).trim() : String(doc.name);
+  const sizeIds: string[] = Array.isArray(body.sizeIds)
+    ? body.sizeIds.map(String)
+    : (doc.sizeIds ?? []).map(String);
+
+  const sizes = await resolveSizes(userId, sizeIds);
+  if (sizes instanceof NextResponse) return sizes;
+  if (sizes.some((s) => s.sqFtPerTon <= 0)) {
+    return NextResponse.json({ error: "Sizes need per-ton weight set on Sizes page" }, { status: 400 });
   }
 
-  const dims = await syncMarbleProducts(userId, id, name, dimensions, weights);
-  await Marble.collection.updateOne(
+  const synced = await syncMarbleProducts(userId, id, name, sizes);
+  await Marble.updateOne(
     { _id: doc._id, userId },
-    { $set: { name, dimensions: dims, dimensionWeights: weights } }
+    {
+      $set: {
+        name,
+        sizeIds: synced.sizeIds,
+        dimensions: synced.dimensions,
+        dimensionWeights: synced.dimensionWeights,
+      },
+    }
   );
 
   const productIds = await Product.find({ userId, marbleId: id }).distinct("_id");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthed, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { mapProduct } from "@/lib/map";
+import { syncAdjustmentLedger } from "@/lib/partner-ledger";
 import { recalcProduct } from "@/lib/recalc-product";
 import { Product } from "@/models/Product";
 import { StockAdjustment } from "@/models/StockAdjustment";
@@ -42,6 +43,17 @@ export async function POST(req: Request, { params }: Ctx) {
     await adj.deleteOne();
     return NextResponse.json({ error: r.error }, { status: 400 });
   }
+
+  const refreshed = await Product.findOne({ _id: id, userId }).lean();
+  await syncAdjustmentLedger({
+    userId,
+    adjustmentId: String(adj._id),
+    productId: id,
+    type,
+    qty: q,
+    unitCost: Number(refreshed?.costPrice) || Number(product.costPrice) || 0,
+    label: `${product.name} · ${product.dimension}`,
+  });
 
   return NextResponse.json(
     {

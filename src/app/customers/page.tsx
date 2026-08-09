@@ -14,12 +14,17 @@ export default function CustomersPage() {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [arrears, setArrears] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [fSearch, setFSearch] = useState("");
 
   const dueByCustomer = useMemo(() => {
     const m = new Map<string, number>();
+    for (const c of shop.customers) {
+      const arrears = Math.max(0, c.arrears || 0);
+      if (arrears > 0) m.set(c.id, arrears);
+    }
     for (const s of shop.sales) {
       if (!s.customerId) continue;
       const due = remainingBalance(s.total, s.amountPaid || 0);
@@ -27,7 +32,7 @@ export default function CustomersPage() {
       m.set(s.customerId, (m.get(s.customerId) || 0) + due);
     }
     return m;
-  }, [shop.sales]);
+  }, [shop.sales, shop.customers]);
 
   const totalReceivable = useMemo(
     () => [...dueByCustomer.values()].reduce((a, b) => a + b, 0),
@@ -40,6 +45,7 @@ export default function CustomersPage() {
     setEditing(null);
     setName("");
     setPhone("");
+    setArrears("");
     setError("");
   };
 
@@ -47,6 +53,7 @@ export default function CustomersPage() {
     setEditing(c);
     setName(c.name);
     setPhone(c.phone);
+    setArrears(c.arrears ? String(c.arrears) : "");
     setError("");
   };
 
@@ -60,6 +67,7 @@ export default function CustomersPage() {
         id: editing?.id,
         name: name.trim(),
         phone: phone.trim(),
+        arrears: Math.max(0, Number(arrears) || 0),
       });
       reset();
     } catch (err) {
@@ -295,6 +303,25 @@ export default function CustomersPage() {
               Phone
             </span>
             <input className="input text-base" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-800">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-teal-700" aria-hidden>
+                <path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              Previous arrears
+            </span>
+            <input
+              className="input text-base"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              value={arrears}
+              onChange={(e) => setArrears(e.target.value)}
+            />
+            <span className="text-xs text-zinc-500">Opening balance owed (before app sales)</span>
           </label>
 
           {error && (

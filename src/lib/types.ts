@@ -14,11 +14,22 @@ export type Customer = {
   id: string;
   name: string;
   phone: string;
+  arrears: number;
+};
+
+export type SizeUnit = "sqft" | "piece";
+
+export type Size = {
+  id: string;
+  label: string;
+  unit: SizeUnit;
+  sqFtPerTon: number;
 };
 
 export type Marble = {
   id: string;
   name: string;
+  sizeIds: string[];
   dimensions: string[];
   dimensionWeights: { dimension: string; sqFtPerTon: number }[];
 };
@@ -26,8 +37,10 @@ export type Marble = {
 export type Product = {
   id: string;
   marbleId: string;
+  sizeId: string | null;
   name: string;
   dimension: string;
+  unit: SizeUnit;
   sqFtPerTon: number;
   sku: string;
   stock: number;
@@ -94,7 +107,7 @@ export type Sale = {
 export type PartnerLedgerEntry = {
   id: string;
   partnerId: string;
-  type: "sale_share" | "payout" | "adjustment" | "investment" | "purchase_share";
+  type: "sale_share" | "payout" | "adjustment" | "investment" | "purchase_share" | "freight_share" | "loss_share" | "surplus_share" | "ownership_share";
   amount: number;
   qty: number;
   saleId: string | null;
@@ -116,6 +129,7 @@ export type Expense = {
 export type ShopData = {
   partners: Partner[];
   customers: Customer[];
+  sizes: Size[];
   marbles: Marble[];
   products: Product[];
   purchases: Purchase[];

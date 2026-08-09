@@ -15,6 +15,7 @@ import type { ShopData } from "./types";
 const empty: ShopData = {
   partners: [],
   customers: [],
+  sizes: [],
   marbles: [],
   products: [],
   purchases: [],
@@ -35,10 +36,16 @@ type ShopApi = ShopData & {
   saveMarble: (input: {
     id?: string;
     name: string;
-    dimensions: string[];
-    dimensionWeights: { dimension: string; sqFtPerTon: number }[];
+    sizeIds: string[];
   }) => Promise<void>;
   deleteMarble: (id: string) => Promise<void>;
+  saveSize: (input: {
+    id?: string;
+    label: string;
+    unit: "sqft" | "piece";
+    sqFtPerTon: number;
+  }) => Promise<void>;
+  deleteSize: (id: string) => Promise<void>;
   savePartner: (input: {
     id?: string;
     name: string;
@@ -46,7 +53,12 @@ type ShopApi = ShopData & {
     incomePercent?: number;
   }) => Promise<void>;
   deletePartner: (id: string) => Promise<void>;
-  saveCustomer: (input: { id?: string; name: string; phone: string }) => Promise<void>;
+  saveCustomer: (input: {
+    id?: string;
+    name: string;
+    phone: string;
+    arrears?: number;
+  }) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   saveExpense: (input: {
     id?: string;
@@ -131,8 +143,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     const saveMarble = async (input: {
       id?: string;
       name: string;
-      dimensions: string[];
-      dimensionWeights: { dimension: string; sqFtPerTon: number }[];
+      sizeIds: string[];
     }) => {
       await mutate(
         input.id ? `/api/marbles/${input.id}` : "/api/marbles",
@@ -141,8 +152,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: input.name,
-            dimensions: input.dimensions,
-            dimensionWeights: input.dimensionWeights,
+            sizeIds: input.sizeIds,
           }),
         },
         input.id ? "Marble updated" : "Marble created"
@@ -151,6 +161,27 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
     const deleteMarble = async (id: string) => {
       await mutate(`/api/marbles/${id}`, { method: "DELETE" }, "Marble deleted");
+    };
+
+    const saveSize = async (input: {
+      id?: string;
+      label: string;
+      unit: "sqft" | "piece";
+      sqFtPerTon: number;
+    }) => {
+      await mutate(
+        input.id ? `/api/sizes/${input.id}` : "/api/sizes",
+        {
+          method: input.id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        },
+        input.id ? "Size updated" : "Size created"
+      );
+    };
+
+    const deleteSize = async (id: string) => {
+      await mutate(`/api/sizes/${id}`, { method: "DELETE" }, "Size deleted");
     };
 
     const savePurchase = async (input: {
@@ -200,7 +231,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       );
     };
 
-    const saveCustomer = async (input: { id?: string; name: string; phone: string }) => {
+    const saveCustomer = async (input: {
+      id?: string;
+      name: string;
+      phone: string;
+      arrears?: number;
+    }) => {
       await mutate(
         input.id ? `/api/customers/${input.id}` : "/api/customers",
         {
@@ -346,6 +382,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       refresh,
       saveMarble,
       deleteMarble,
+      saveSize,
+      deleteSize,
       savePartner,
       deletePartner,
       saveCustomer,

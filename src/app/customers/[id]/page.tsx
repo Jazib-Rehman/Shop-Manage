@@ -76,12 +76,22 @@ export default function CustomerDetailPage() {
       }
     }
     payments.sort((a, b) => b.paidAt.localeCompare(a.paidAt));
-    const due = Math.max(0, revenue - paid);
+    const due = Math.max(0, revenue - paid) + Math.max(0, customer?.arrears || 0);
     const last = sales.length
       ? sales.reduce((m, s) => (s.date > m ? s.date : m), sales[0].date)
       : null;
-    return { revenue, paid, due, qty, overdue, payments, last };
-  }, [sales, shop.products]);
+    return {
+      revenue,
+      paid,
+      due,
+      salesDue: Math.max(0, revenue - paid),
+      arrears: Math.max(0, customer?.arrears || 0),
+      qty,
+      overdue,
+      payments,
+      last,
+    };
+  }, [sales, shop.products, customer?.arrears]);
 
   const openAdd = (sale: Sale) => {
     const due = remainingBalance(sale.total, sale.amountPaid || 0);
@@ -163,7 +173,7 @@ export default function CustomerDetailPage() {
     { label: "Total business", value: money(stats.revenue), tone: "text-zinc-900" },
     { label: "Received", value: money(stats.paid), tone: "text-emerald-700" },
     { label: "Outstanding", value: money(stats.due), tone: stats.due > 0 ? "text-amber-700" : "text-zinc-400" },
-    { label: "Overdue", value: money(stats.overdue), tone: stats.overdue > 0 ? "text-red-700" : "text-zinc-400" },
+    { label: "Prior arrears", value: money(stats.arrears), tone: stats.arrears > 0 ? "text-amber-700" : "text-zinc-400" },
   ];
 
   const secondary = [
@@ -197,7 +207,7 @@ export default function CustomerDetailPage() {
               onClick={() => setSettleOpen(true)}
               className="ml-auto shrink-0 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
             >
-              Settle all · {money(stats.due)}
+              Settle all · {money(stats.salesDue)}
             </button>
           )}
         </div>
@@ -237,7 +247,7 @@ export default function CustomerDetailPage() {
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-zinc-900">{p ? productLabel(p) : "—"}</p>
                     <p className="mt-0.5 text-sm text-zinc-600">
-                      {new Date(s.date).toLocaleDateString()} · {sqft(s.qty)} @ {money(s.unitPrice)}
+                      {new Date(s.date).toLocaleDateString()} · {sqft(s.qty, p?.unit)} @ {money(s.unitPrice)}
                       {s.dueDate && due > 0 && ` · due by ${new Date(s.dueDate).toLocaleDateString()}`}
                     </p>
                   </div>
@@ -305,7 +315,7 @@ export default function CustomerDetailPage() {
             <div className="border-b border-zinc-200 px-5 py-4">
               <h2 className="text-lg font-bold text-zinc-900">Settle all dues?</h2>
               <p className="mt-0.5 text-sm text-zinc-600">
-                {customer.name} · {unpaidSales.length} sale{unpaidSales.length === 1 ? "" : "s"} · {money(stats.due)}
+                {customer.name} · {unpaidSales.length} sale{unpaidSales.length === 1 ? "" : "s"} · {money(stats.salesDue)}
               </p>
             </div>
             <ul className="max-h-48 divide-y divide-zinc-100 overflow-y-auto px-5">
@@ -325,7 +335,7 @@ export default function CustomerDetailPage() {
                 Cancel
               </button>
               <button type="button" disabled={saving} onClick={onSettleAll} className="rounded-lg bg-emerald-700 px-4 py-2.5 text-base font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-                {saving ? "Settling…" : `Confirm settle · ${money(stats.due)}`}
+                {saving ? "Settling…" : `Confirm settle · ${money(stats.salesDue)}`}
               </button>
             </div>
           </div>
